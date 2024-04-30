@@ -1,0 +1,7 @@
+INFO : [lsi.ubu.CompraBilleteTren.main(CompraBilleteTren.java:28)]2024-03-15 17:22:21.829 [main] CompraBilleteTren - Comienzo de los tests
+INFO : [lsi.ubu.tests.Tests.ejecutarTestsCompraBilletes(Tests.java:58)]2024-03-15 17:22:21.965 [main] Tests - NO se da cuenta de que no existe el viaje MAL
+INFO : [lsi.ubu.tests.Tests.ejecutarTestsCompraBilletes(Tests.java:73)]2024-03-15 17:22:21.966 [main] Tests - NO se da cuenta de que no hay plazas MAL
+DEBUG: [lsi.ubu.util.PoolDeConexiones.getConnection(PoolDeConexiones.java:103)]2024-03-15 17:22:22.979 [main] PoolDeConexiones - Activacion de Autocommit=false
+DEBUG: [lsi.ubu.util.PoolDeConexiones.getConnection(PoolDeConexiones.java:111)]2024-03-15 17:22:22.980 [main] PoolDeConexiones - Activacion de Autocommit=false ::: Nivel de Aislamiento=TRANSACTION_READ_COMMITTED
+INFO : [lsi.ubu.tests.Tests.ejecutarTestsCompraBilletes(Tests.java:106)]2024-03-15 17:22:23.177 [main] Tests - Compra ticket MAL
+INFO : [lsi.ubu.CompraBilleteTren.main(CompraBilleteTren.java:43)]2024-03-15 17:22:23.213 [main] CompraBilleteTren - Fin de los tests
