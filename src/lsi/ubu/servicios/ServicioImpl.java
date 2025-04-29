@@ -19,59 +19,109 @@ public class ServicioImpl implements Servicio {
 	private static final int DIAS_DE_ALQUILER = 4;
 
 	public void alquilar(String nifCliente, String matricula, Date fechaIni, Date fechaFin) throws SQLException {
-		PoolDeConexiones pool = PoolDeConexiones.getInstance();
+		 PoolDeConexiones pool = PoolDeConexiones.getInstance();
+	        Connection con = null;
+	        PreparedStatement st = null;
+	        ResultSet rs = null;
 
-		Connection con = null;
-		PreparedStatement st = null;
-		ResultSet rs = null;
+	        long diasDiff = DIAS_DE_ALQUILER;
+	        if (fechaFin != null) {
+	            diasDiff = TimeUnit.MILLISECONDS.toDays(fechaFin.getTime() - fechaIni.getTime());
 
-		/*
-		 * El calculo de los dias se da hecho
-		 */
-		long diasDiff = DIAS_DE_ALQUILER;
-		if (fechaFin != null) {
-			diasDiff = TimeUnit.MILLISECONDS.toDays(fechaFin.getTime() - fechaIni.getTime());
+	            if (diasDiff < 1) {
+	                throw new AlquilerCochesException(AlquilerCochesException.SIN_DIAS);
+	            }
+	        } else {
+	            fechaFin = new Date(fechaIni.getTime() + TimeUnit.DAYS.toMillis(DIAS_DE_ALQUILER));
+	        }
 
-			if (diasDiff < 1) {
-				throw new AlquilerCochesException(AlquilerCochesException.SIN_DIAS);
-			}
-		}
+	        try {
+	            con = pool.getConnection();
+	            con.setAutoCommit(false);
 
-		try {
-			con = pool.getConnection();
+	            // 1. Verificar que el cliente existe
+	            st = con.prepareStatement("SELECT 1 FROM clientes WHERE nif = ?");
+	            st.setString(1, nifCliente);
+	            rs = st.executeQuery();
+	            if (!rs.next()) {
+	            	throw new AlquilerCochesException(AlquilerCochesException.CLIENTE_NO_EXIST);
+	            }
+	            rs.close();
+	            st.close();
 
-			/* A completar por el alumnado... */
+	            // 2. Verificar que el vehículo existe
+	            st = con.prepareStatement("SELECT 1 FROM vehiculos WHERE matricula = ?");
+	            st.setString(1, matricula);
+	            rs = st.executeQuery();
+	            if (!rs.next()) {
+	            	throw new AlquilerCochesException(AlquilerCochesException.VEHICULO_NO_EXIST);
+	            }
+	            rs.close();
+	            st.close();
 
-			/* ================================= AYUDA R�PIDA ===========================*/
-			/*
-			 * Algunas de las columnas utilizan tipo numeric en SQL, lo que se traduce en
-			 * BigDecimal para Java.
-			 * 
-			 * Convertir un entero en BigDecimal: new BigDecimal(diasDiff)
-			 * 
-			 * Sumar 2 BigDecimals: usar metodo "add" de la clase BigDecimal
-			 * 
-			 * Multiplicar 2 BigDecimals: usar metodo "multiply" de la clase BigDecimal
-			 *
-			 * 
-			 * Paso de util.Date a sql.Date java.sql.Date sqlFechaIni = new
-			 * java.sql.Date(sqlFechaIni.getTime());
-			 *
-			 *
-			 * Recuerda que hay casos donde la fecha fin es nula, por lo que se debe de
-			 * calcular sumando los dias de alquiler (ver variable DIAS_DE_ALQUILER) a la
-			 * fecha ini.
-			 */
+	            // 3. Verificar que no hay solapamiento con reservas existentes
+	            String sqlSolape = """
+	                SELECT 1 FROM reservas
+	                WHERE matricula = ?
+	                  AND NOT (fecha_fin < ? OR fecha_ini > ?)
+	            """;
+	            st = con.prepareStatement(sqlSolape);
+	            st.setString(1, matricula);
+	            st.setDate(2, new java.sql.Date(fechaIni.getTime()));
+	            st.setDate(3, new java.sql.Date(fechaFin.getTime()));
+	            rs = st.executeQuery();
+	            if (rs.next()) {
+	                throw new AlquilerCochesException(AlquilerCochesException.VEHICULO_OCUPADO);
+	            }
+	            rs.close();
+	            st.close();
 
-		} catch (SQLException e) {
-			// Completar por el alumno
+	            // 4. Insertar reserva
+	            String sqlInsert = """
+	                INSERT INTO reservas (idReserva, cliente, matricula, fecha_ini, fecha_fin)
+	                VALUES (seq_reservas.nextval, ?, ?, ?, ?)
+	            """;
+	            st = con.prepareStatement(sqlInsert);
+	            st.setString(1, nifCliente);
+	            st.setString(2, matricula);
+	            st.setDate(3, new java.sql.Date(fechaIni.getTime()));
+	            st.setDate(4, new java.sql.Date(fechaFin.getTime()));
+	            st.executeUpdate();
+	            st.close();
 
-			LOGGER.debug(e.getMessage());
+	            con.commit();
 
-			throw e;
+	        } catch (SQLException e) {
+	            if (con != null) {
+	                try {
+	                    con.rollback();
+	                    LOGGER.error("Transacción deshecha debido a un error", e);
+	                } catch (SQLException ex) {
+	                    LOGGER.error("Error al hacer rollback", ex);
+	                }
+	            }
 
-		} finally {
-			/* A rellenar por el alumnado*/
-		}
-	}
+	            // Logear cualquier otra excepción no relacionada con AlquilerCochesException
+	            if (!(e instanceof AlquilerCochesException)) {
+	                LOGGER.error("Error inesperado", e);
+	            }
+	            throw e;
+
+	        } finally {
+	            try {
+	                if (rs != null) rs.close();
+	            } catch (SQLException ignored) {}
+
+	            try {
+	                if (st != null) st.close();
+	            } catch (SQLException ignored) {}
+
+	            try {
+	                if (con != null) {
+	                    con.setAutoCommit(true);
+	                    con.close();
+	                }
+	            } catch (SQLException ignored) {}
+	        }
+	    }
 }
